@@ -27,8 +27,7 @@
         {% csrf_token %}
         {% bootstrap_form_errors sform %}
         {% bootstrap_form_errors form %}
-        <div class="row">
-            <div class="col-xs-12 col-lg-10">
+
                 <div class="tabbed-form">
                     <fieldset>
                         <legend>{% trans "General" %}</legend>
@@ -99,24 +98,17 @@
                         <legend>{% trans "Privacy" %}</legend>
                         {% bootstrap_field sform.privacy_policy layout="control" %}
                     </fieldset>
+                    <fieldset id="tab-organizer-change-history" data-no-submit>
+                        <legend>{% trans "Change history" %}</legend>
+                        {% include "pretixcontrol/includes/logs.html" with obj=organizer %}
+                    </fieldset>
                 </div>
                 <div class="form-group submit-group">
                     <button type="submit" class="btn btn-primary btn-save">
                         {% trans "Save" %}
                     </button>
                 </div>
-            </div>
-            <div class="col-xs-12 col-lg-2">
-                <div class="panel panel-default">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">
-                            {% trans "Change history" %}
-                        </h3>
-                    </div>
-                    {% include "pretixcontrol/includes/logs.html" with obj=organizer %}
-                </div>
-            </div>
-        </div>
+
     </form>
 
     <div class="modal fade" id="cropperModal" tabindex="-1" role="dialog" aria-labelledby="cropperModalLabel"
