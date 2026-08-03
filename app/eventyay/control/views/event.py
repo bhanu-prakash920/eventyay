@@ -35,6 +35,7 @@ from i18nfield.utils import I18nJSONEncoder
 
 from eventyay.base.channels import get_all_sales_channels
 from eventyay.base.email import get_available_placeholders
+from eventyay.common.sanitizers import sanitize_email_html
 from eventyay.base.models import (
     Event,
     LogEntry,
@@ -47,11 +48,10 @@ from eventyay.base.models.event import EventMetaValue
 from eventyay.base.services import tickets
 from eventyay.base.services.invoices import build_preview_invoice_pdf
 from eventyay.base.signals import register_ticket_outputs
-from eventyay.base.templatetags.rich_text import markdown_compile_email
+from eventyay.base.templatetags.rich_text import expand_email_preview_placeholders, markdown_compile_email
 from eventyay.control.forms.event import (
     CancelSettingsForm,
     CommentForm,
-    ConfirmTextFormset,
     EventDeleteForm,
     EventMetaValueForm,
     GeneralEventSettingsForm,
@@ -186,7 +186,6 @@ class EventUpdate(
         context['sform'] = self.sform
         context['meta_forms'] = self.meta_forms
         context['product_meta_property_formset'] = self.product_meta_property_formset
-        context['confirm_texts_formset'] = self.confirm_texts_formset
         return context
 
     @transaction.atomic
@@ -199,13 +198,10 @@ class EventUpdate(
         )
         self.save_meta()
         self.save_product_meta_property_formset(self.object)
-        self.save_confirm_texts_formset(self.object)
         change_css = False
 
-        if self.sform.has_changed() or self.confirm_texts_formset.has_changed():
+        if self.sform.has_changed():
             data = {k: self.request.event.settings.get(k) for k in self.sform.changed_data}
-            if self.confirm_texts_formset.has_changed():
-                data.update(confirm_texts=self.confirm_texts_formset.cleaned_data)
             self.request.event.log_action('eventyay.event.settings', user=self.request.user, data=data)
             if any(p in self.sform.changed_data for p in SETTINGS_AFFECTING_CSS):
                 change_css = True
@@ -255,14 +251,12 @@ class EventUpdate(
         sform_valid = self.sform.is_valid()
         meta_forms_valid = all([f.is_valid() for f in self.meta_forms])
         product_meta_property_formset_valid = self.product_meta_property_formset.is_valid()
-        confirm_texts_formset_valid = self.confirm_texts_formset.is_valid()
 
         if (
             form_valid
             and sform_valid
             and meta_forms_valid
             and product_meta_property_formset_valid
-            and confirm_texts_formset_valid
         ):
             # Timezone processing for presale_start and presale_end (fields in this form)
             # is now handled within form.clean()
@@ -278,8 +272,6 @@ class EventUpdate(
                 error_messages.append('Meta data form validation failed.')
             if not product_meta_property_formset_valid:
                 error_messages.append('Product meta property form validation failed.')
-            if not confirm_texts_formset_valid:
-                error_messages.append('Confirmation texts form validation failed.')
 
             if error_messages:
                 for msg in error_messages:
@@ -329,29 +321,6 @@ class EventUpdate(
                 continue
             form.instance.event = obj
             form.save()
-
-    @cached_property
-    def confirm_texts_formset(self):
-        initial = [
-            {'text': text, 'ORDER': order}
-            for order, text in enumerate(self.object.settings.get('confirm_texts', as_type=LazyI18nStringList))
-        ]
-        return ConfirmTextFormset(
-            self.request.POST if self.request.method == 'POST' else None,
-            event=self.object,
-            prefix='confirm-texts',
-            initial=initial,
-        )
-
-    def save_confirm_texts_formset(self, obj):
-        obj.settings.confirm_texts = LazyI18nStringList(
-            form_data['text'].data
-            for form_data in sorted(
-                self.confirm_texts_formset.cleaned_data,
-                key=operator.itemgetter('ORDER'),
-            )
-            if not form_data.get('DELETE', False)
-        )
 
 
 class EventPlugins(
@@ -925,6 +894,37 @@ class MailSettingsRendererPreview(MailSettingsPreview):
                 return r
         else:
             raise Http404(_('Unknown e-mail renderer.'))
+
+
+class EditorEmailPreview(EventPermissionRequiredMixin, View):
+    """AJAX endpoint for previewing email body HTML from the Tiptap email editor.
+
+    Accepts a JSON POST body ``{ "html": "<p>...</p>", "locale": "en" }``,
+    sanitizes the HTML, expands ``{placeholder}`` tokens with sample values,
+    and returns ``{ "html": "<p>...</p>" }``.
+    """
+
+    permission = ('can_change_orders', 'can_change_event_settings')
+
+    def post(self, request, *args, **kwargs):
+        try:
+            payload = json.loads(request.body)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return HttpResponseBadRequest('Invalid JSON body')
+
+        raw_html = payload.get('html', '')
+        if not isinstance(raw_html, str):
+            return HttpResponseBadRequest('html must be a string')
+
+        locale = payload.get('locale')
+        if locale is not None and not isinstance(locale, str):
+            return HttpResponseBadRequest('locale must be a string')
+
+        safe_html = sanitize_email_html(raw_html)
+        preview_html = expand_email_preview_placeholders(
+            safe_html, request.event, locale=locale or None
+        )
+        return JsonResponse({'html': preview_html})
 
 
 class TicketSettingsPreview(EventPermissionRequiredMixin, View):

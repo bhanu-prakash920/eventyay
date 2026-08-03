@@ -2,6 +2,7 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 from django import forms
 from django.conf import settings
@@ -56,7 +57,8 @@ def primary_font_kwargs():
     from eventyay.presale.style import SYSTEM_FONT_CHOICES, get_fonts
 
     choices = list(SYSTEM_FONT_CHOICES)
-    choices += [(a, {'title': a, 'data': v}) for a, v in get_fonts().items()]
+    # Label must not be a plain dict/Mapping: Django mistakes it for an optgroup
+    choices += [(a, SimpleNamespace(title=a, data=v)) for a, v in get_fonts().items()]
     return {
         'choices': choices,
     }
@@ -1650,7 +1652,7 @@ DEFAULT_SETTINGS = {
     },
     'mail_bcc': {'default': None, 'type': str},
     'mail_from': {
-        'default': settings.MAIL_FROM,
+        'default': settings.DEFAULT_FROM_EMAIL,
         'type': str,
         'form_class': forms.EmailField,
         'serializer_class': serializers.EmailField,
