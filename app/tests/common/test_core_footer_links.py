@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 import pytest
+from django.template import Context, Template
 from eventyay.common.context_processors import system_information
 from eventyay.control.forms.global_settings import GlobalSettingsForm
 from eventyay.control.views.pages import SystemPageView
@@ -45,3 +46,31 @@ def test_system_page_view_slug_handling():
         mock_page = MagicMock(title='Terms of Service', slug='terms')
         mock_get.return_value = mock_page
         assert view.get_page() == mock_page
+
+
+def test_core_footer_template_structure():
+    template_str = """
+    {% if core_footer_links %}
+    <nav class="core-footer-nav">
+        <ul>
+            {% for link in core_footer_links %}
+            <li><a href="{{ link.url }}">{{ link.label }}</a></li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+    """
+    t = Template(template_str)
+    sample_links = [
+        {'key': 'events', 'label': 'Events', 'url': '/upcoming', 'target_blank': False},
+        {'key': 'terms', 'label': 'Terms', 'url': '/terms', 'target_blank': False},
+        {'key': 'documentation', 'label': 'Documentation', 'url': 'https://docs.eventyay.com', 'target_blank': True},
+    ]
+    html = t.render(Context({'core_footer_links': sample_links}))
+    assert '<nav class="core-footer-nav">' in html
+    assert 'href="/upcoming"' in html
+    assert 'href="/terms"' in html
+    assert 'href="https://docs.eventyay.com"' in html
+    assert 'Events' in html
+    assert 'Terms' in html
+    assert 'Documentation' in html
