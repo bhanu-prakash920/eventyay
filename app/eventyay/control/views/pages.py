@@ -206,3 +206,37 @@ class ShowPageView(TemplateView):
             url_schemes=url_schemes,
         )
         return ctx
+
+
+class SystemPageView(ShowPageView):
+    """Render system pages (terms, privacy, pricing, support) from DB or with default content if enabled."""
+
+    slug = None
+
+    def get_slug(self):
+        return self.slug or self.kwargs.get('slug')
+
+    def get_page(self):
+        slug = self.get_slug()
+        try:
+            return Page.objects.get(slug=slug)
+        except Page.DoesNotExist:
+            from eventyay.base.settings import GlobalSettingsObject
+
+            gs = GlobalSettingsObject().settings
+            enabled_key = f'footer_link_{slug}_enabled'
+            if gs.get(enabled_key, as_type=bool, default=True):
+                title_map = {
+                    'terms': _('Terms of Service'),
+                    'privacy': _('Privacy Policy'),
+                    'pricing': _('Pricing'),
+                    'support': _('Support & Help'),
+                }
+                title = title_map.get(slug, slug.capitalize())
+                return Page(
+                    title=title,
+                    slug=slug,
+                    text=f'# {title}\n\n' + str(_('Content for this page has not been configured yet.')),
+                )
+            raise Http404(_('The requested page does not exist.'))
+
