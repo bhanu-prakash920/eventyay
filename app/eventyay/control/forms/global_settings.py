@@ -45,6 +45,37 @@ class GlobalSettingsForm(SettingsForm):
         if global_settings.get('email_vendor') is None or global_settings.get('email_vendor') == '':
             self.obj.settings.set('email_vendor', 'smtp')
 
+        # Core platform footer link defaults
+        if global_settings.get('footer_link_events_enabled') is None:
+            global_settings.set('footer_link_events_enabled', True)
+        if global_settings.get('footer_link_events_url') is None:
+            global_settings.set('footer_link_events_url', '/upcoming')
+
+        if global_settings.get('footer_link_terms_enabled') is None:
+            global_settings.set('footer_link_terms_enabled', True)
+        if global_settings.get('footer_link_terms_url') is None:
+            global_settings.set('footer_link_terms_url', '/terms')
+
+        if global_settings.get('footer_link_privacy_enabled') is None:
+            global_settings.set('footer_link_privacy_enabled', True)
+        if global_settings.get('footer_link_privacy_url') is None:
+            global_settings.set('footer_link_privacy_url', '/privacy')
+
+        if global_settings.get('footer_link_pricing_enabled') is None:
+            global_settings.set('footer_link_pricing_enabled', True)
+        if global_settings.get('footer_link_pricing_url') is None:
+            global_settings.set('footer_link_pricing_url', '/pricing')
+
+        if global_settings.get('footer_link_documentation_enabled') is None:
+            global_settings.set('footer_link_documentation_enabled', True)
+        if global_settings.get('footer_link_documentation_url') is None:
+            global_settings.set('footer_link_documentation_url', 'https://docs.eventyay.com')
+
+        if global_settings.get('footer_link_support_enabled') is None:
+            global_settings.set('footer_link_support_enabled', True)
+        if global_settings.get('footer_link_support_url') is None:
+            global_settings.set('footer_link_support_url', '/support')
+
     def __init__(self, *args, **kwargs):
         self.obj = GlobalSettingsObject()
         self._setting_default()
@@ -499,12 +530,111 @@ class GlobalSettingsForm(SettingsForm):
                         required=True,
                     ),
                 ),
+                # Core platform footer links
+                (
+                    'footer_link_events_enabled',
+                    forms.BooleanField(
+                        label=_('Show "Events" footer link'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_events_url',
+                    forms.CharField(
+                        label=_('"Events" link URL'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_terms_enabled',
+                    forms.BooleanField(
+                        label=_('Show "Terms" footer link'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_terms_url',
+                    forms.CharField(
+                        label=_('"Terms" link URL'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_privacy_enabled',
+                    forms.BooleanField(
+                        label=_('Show "Privacy" footer link'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_privacy_url',
+                    forms.CharField(
+                        label=_('"Privacy" link URL'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_pricing_enabled',
+                    forms.BooleanField(
+                        label=_('Show "Pricing" footer link'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_pricing_url',
+                    forms.CharField(
+                        label=_('"Pricing" link URL'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_documentation_enabled',
+                    forms.BooleanField(
+                        label=_('Show "Documentation" footer link'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_documentation_url',
+                    forms.CharField(
+                        label=_('"Documentation" link URL'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_support_enabled',
+                    forms.BooleanField(
+                        label=_('Show "Support" footer link'),
+                        required=False,
+                    ),
+                ),
+                (
+                    'footer_link_support_url',
+                    forms.CharField(
+                        label=_('"Support" link URL'),
+                        required=False,
+                    ),
+                ),
             ]
         )
 
         self.field_groups = [
             ('basics', _('Basics'), [
                 'footer_text', 'footer_link', 'banner_message', 'banner_message_detail',
+            ]),
+            ('pages', _('Pages'), [
+                'footer_link_events_enabled',
+                'footer_link_events_url',
+                'footer_link_terms_enabled',
+                'footer_link_terms_url',
+                'footer_link_privacy_enabled',
+                'footer_link_privacy_url',
+                'footer_link_pricing_enabled',
+                'footer_link_pricing_url',
+                'footer_link_documentation_enabled',
+                'footer_link_documentation_url',
+                'footer_link_support_enabled',
+                'footer_link_support_url',
             ]),
             ('localization', _('Localization'), [
                 'region',
