@@ -180,7 +180,8 @@ def system_information(request):
 
     context['warning_update_available'] = False
     context['base_path'] = settings.BASE_PATH
-    if not request.user.is_anonymous and request.user.is_administrator and request.path.startswith('/orga'):
+    user = getattr(request, 'user', None)
+    if user and not user.is_anonymous and getattr(user, 'is_administrator', False) and request.path.startswith('/orga'):
         gs_obj = GlobalSettings()
         if gs_obj.settings.update_check_result_warning:
             context['warning_update_available'] = True
