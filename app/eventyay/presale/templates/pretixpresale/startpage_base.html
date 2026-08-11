@@ -223,6 +223,7 @@
                 {% for footer in footer_links %}
                     · <a href="{% safelink footer.url %}" target="_blank" rel="noopener">{{ footer.label }}</a>
                 {% endfor %}
+                {% include "common/includes/core_footer.html" %}
                 <ul class="list-inline text-center startpage-footer-links">
                     {% if show_link_in_footer_for_start_page %}
                         {% for page in show_link_in_footer_for_start_page %}
@@ -234,7 +235,6 @@
                         {% endfor %}
                     {% endif %}
                 </ul>
-                {% include "common/includes/core_footer.html" %}
             </footer>
         </div>
         {% include "pretixpresale/includes/share_dialog.html" %}

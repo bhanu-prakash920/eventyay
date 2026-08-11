@@ -2,17 +2,13 @@
 {% load safelink %}
 
 {% if core_footer_links %}
-<nav class="core-footer-nav" aria-label="{% translate 'Platform links' %}">
-    <ul class="core-footer-links-list">
-        {% for link in core_footer_links %}
-        <li class="core-footer-link-item">
-            <a href="{% safelink link.url %}"
-               class="core-footer-link"
-               {% if link.target_blank %}target="_blank" rel="noopener"{% endif %}>
-                {{ link.label }}
-            </a>
-        </li>
-        {% endfor %}
-    </ul>
-</nav>
+<div class="core-footer-links-container" style="margin-top: 8px;">
+    {% for link in core_footer_links %}
+        <a href="{% safelink link.url %}"
+           style="margin: 0 10px; color: inherit; text-decoration: none;"
+           {% if link.target_blank %}target="_blank" rel="noopener"{% endif %}>
+            {{ link.label }}
+        </a>
+    {% endfor %}
+</div>
 {% endif %}
