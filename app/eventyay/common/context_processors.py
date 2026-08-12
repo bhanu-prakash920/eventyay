@@ -167,7 +167,7 @@ def system_information(request):
         if enabled and url:
             core_footer_links.append({
                 'key': key,
-                'label': str(label),
+                'label': label,
                 'url': url,
                 'target_blank': url.startswith('http://') or url.startswith('https://'),
             })
