@@ -232,8 +232,10 @@ class SystemPageView(ShowPageView):
                     'pricing': _('Pricing'),
                     'support': _('Support & Help'),
                 }
+                from i18nfield.strings import LazyI18nString
+
                 title = title_map.get(slug, slug.capitalize())
-                custom_text = gs.get(f'footer_page_{slug}_text')
+                custom_text = gs.get(f'footer_page_{slug}_text', as_type=LazyI18nString)
                 text = custom_text if custom_text else f'# {title}\n\n' + str(_('Content for this page has not been configured yet.'))
                 return Page(
                     title=title,
