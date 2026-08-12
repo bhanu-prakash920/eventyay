@@ -233,10 +233,12 @@ class SystemPageView(ShowPageView):
                     'support': _('Support & Help'),
                 }
                 title = title_map.get(slug, slug.capitalize())
+                custom_text = gs.get(f'footer_page_{slug}_text')
+                text = custom_text if custom_text else f'# {title}\n\n' + str(_('Content for this page has not been configured yet.'))
                 return Page(
                     title=title,
                     slug=slug,
-                    text=f'# {title}\n\n' + str(_('Content for this page has not been configured yet.')),
+                    text=text,
                 )
             raise Http404(_('The requested page does not exist.'))
 
