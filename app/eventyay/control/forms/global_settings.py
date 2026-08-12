@@ -7,7 +7,7 @@ from django.core.validators import MinValueValidator
 from django.utils.translation import gettext_lazy as _
 from i18nfield.forms import I18nFormField, I18nTextarea, I18nTextInput
 
-from eventyay.base.forms import SecretKeySettingsField, SecretKeySettingsWidget, SettingsForm
+from eventyay.base.forms import I18nMarkdownTextarea, SecretKeySettingsField, SecretKeySettingsWidget, SettingsForm
 from eventyay.base.settings import EVENT_SERIES_CREATION_ENABLED, MEETUP_CREATION_ENABLED, GlobalSettingsObject
 from eventyay.base.signals import register_global_settings
 
@@ -615,6 +615,43 @@ class GlobalSettingsForm(SettingsForm):
                         required=False,
                     ),
                 ),
+                # Page HTML/Markdown content fields
+                (
+                    'footer_page_terms_text',
+                    I18nFormField(
+                        widget=I18nMarkdownTextarea,
+                        required=False,
+                        label=_('"Terms of Service" page content'),
+                        help_text=_('HTML or Markdown content for the /terms page.'),
+                    ),
+                ),
+                (
+                    'footer_page_privacy_text',
+                    I18nFormField(
+                        widget=I18nMarkdownTextarea,
+                        required=False,
+                        label=_('"Privacy Policy" page content'),
+                        help_text=_('HTML or Markdown content for the /privacy page.'),
+                    ),
+                ),
+                (
+                    'footer_page_pricing_text',
+                    I18nFormField(
+                        widget=I18nMarkdownTextarea,
+                        required=False,
+                        label=_('"Pricing" page content'),
+                        help_text=_('HTML or Markdown content for the /pricing page.'),
+                    ),
+                ),
+                (
+                    'footer_page_support_text',
+                    I18nFormField(
+                        widget=I18nMarkdownTextarea,
+                        required=False,
+                        label=_('"Support" page content'),
+                        help_text=_('HTML or Markdown content for the /support page.'),
+                    ),
+                ),
             ]
         )
 
@@ -627,14 +664,18 @@ class GlobalSettingsForm(SettingsForm):
                 'footer_link_events_url',
                 'footer_link_terms_enabled',
                 'footer_link_terms_url',
+                'footer_page_terms_text',
                 'footer_link_privacy_enabled',
                 'footer_link_privacy_url',
+                'footer_page_privacy_text',
                 'footer_link_pricing_enabled',
                 'footer_link_pricing_url',
+                'footer_page_pricing_text',
                 'footer_link_documentation_enabled',
                 'footer_link_documentation_url',
                 'footer_link_support_enabled',
                 'footer_link_support_url',
+                'footer_page_support_text',
             ]),
             ('localization', _('Localization'), [
                 'region',
