@@ -2,10 +2,12 @@ import logging
 
 import i18nfield.forms
 from django import forms
+from django.conf import settings
 from django.core.files import File
 from django.core.validators import URLValidator
 from django.forms.models import ModelFormMetaclass
 from django.utils.crypto import get_random_string
+from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from formtools.wizard.views import SessionWizardView
@@ -252,10 +254,6 @@ class I18nMarkdownTextarea(i18nfield.forms.I18nTextarea):
         super().__init__(attrs=attrs, **kwargs)
 
     def render(self, name, value, attrs=None, renderer=None):
-        from django.conf import settings
-        from django.utils.html import escape
-        from django.utils.safestring import mark_safe
-
         if not isinstance(value, dict):
             value = self.decompress(value)
 
@@ -277,8 +275,8 @@ class I18nMarkdownTextarea(i18nfield.forms.I18nTextarea):
             textarea_html = widget.render(f'{name}_{i}', widget_value, final_attrs_widget, renderer=renderer)
 
             wrapped_html = f'''
-            <div class="i18n-textarea-wrapper" style="margin-bottom: 12px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; background: #fdfdfd;">
-                <div class="i18n-lang-header" style="font-weight: 600; font-size: 13px; margin-bottom: 4px; color: #555;">
+            <div class="i18n-textarea-wrapper">
+                <div class="i18n-lang-header">
                     <span class="i18n-lang-name">{escape(human_locale_name)}</span>
                 </div>
                 {textarea_html}
@@ -286,7 +284,7 @@ class I18nMarkdownTextarea(i18nfield.forms.I18nTextarea):
             '''
             output.append(wrapped_html)
 
-        return mark_safe(f'<div class="i18n-form-group" id="{escape(id_) if id_ else ""}">{"".join(output)}</div>')
+        return mark_safe(f'<div class="i18n-form-group" id="{escape(id_) if id_ else ""}">{ "".join(output) }</div>')
 
 
 class I18nAutoExpandingTextarea(i18nfield.forms.I18nTextarea):
