@@ -1,3 +1,4 @@
+import re
 from unittest.mock import MagicMock, patch
 import pytest
 from django.template.loader import render_to_string
@@ -23,7 +24,7 @@ def test_global_settings_form_footer_defaults():
 
 def test_context_processor_core_footer_links(rf):
     request = rf.get('/')
-    with patch('eventyay.base.settings.GlobalSettingsObject') as mock_gso:
+    with patch('eventyay.common.context_processors.GlobalSettingsObject') as mock_gso:
         mock_settings = MagicMock()
         mock_settings.get.side_effect = lambda k, **kwargs: (
             True if 'enabled' in k else kwargs.get('default', '')
@@ -41,14 +42,23 @@ def test_context_processor_core_footer_links(rf):
 
 
 def test_system_page_view_slug_handling():
+    # Test setting slug attribute directly
     view = SystemPageView()
     view.slug = 'terms'
     assert view.get_slug() == 'terms'
 
+    # Test via view.kwargs URL dispatch
+    view_kwargs = SystemPageView()
+    view_kwargs.kwargs = {'slug': 'privacy'}
+    assert view_kwargs.get_slug() == 'privacy'
+
     with patch('eventyay.control.views.pages.Page.objects.get') as mock_get:
-        mock_page = MagicMock(title='Terms of Service', slug='terms')
-        mock_get.return_value = mock_page
-        assert view.get_page() == mock_page
+        mock_page_terms = MagicMock(title='Terms of Service', slug='terms')
+        mock_page_privacy = MagicMock(title='Privacy Policy', slug='privacy')
+        mock_get.side_effect = lambda slug: mock_page_privacy if slug == 'privacy' else mock_page_terms
+
+        assert view.get_page() == mock_page_terms
+        assert view_kwargs.get_page() == mock_page_privacy
 
 
 def test_system_page_view_custom_content():
@@ -56,7 +66,7 @@ def test_system_page_view_custom_content():
     view.slug = 'privacy'
 
     with patch('eventyay.control.views.pages.Page.objects.get', side_effect=Page.DoesNotExist):
-        with patch('eventyay.base.settings.GlobalSettingsObject') as mock_gso:
+        with patch('eventyay.control.views.pages.GlobalSettingsObject') as mock_gso:
             mock_settings = MagicMock()
             mock_settings.get.side_effect = lambda k, **kwargs: (
                 '# Custom Privacy Content' if k == 'footer_page_privacy_text' else True
@@ -74,11 +84,27 @@ def test_core_footer_template_structure():
         {'key': 'documentation', 'label': 'Documentation', 'url': 'https://docs.eventyay.com', 'target_blank': True},
     ]
     html = render_to_string('common/includes/core_footer.html', {'core_footer_links': sample_links})
+
     assert 'core-footer-nav' in html
     assert 'core-footer-links-container' in html
-    assert 'upcoming' in html
-    assert 'terms' in html
-    assert 'docs.eventyay.com' in html
+
+    def anchor_for(fragment):
+        match = re.search(rf'<a[^>]*href="[^"]*{re.escape(fragment)}[^"]*"[^>]*>', html)
+        assert match, f'no anchor found containing {fragment!r}'
+        return match.group()
+
+    # Internal links must NOT open in a new tab
+    events_a = anchor_for('upcoming')
+    assert 'target="_blank"' not in events_a
+
+    terms_a = anchor_for('terms')
+    assert 'target="_blank"' not in terms_a
+
+    # External link must open in a new tab with rel="noopener"
+    docs_a = anchor_for('docs.eventyay.com')
+    assert 'target="_blank"' in docs_a
+    assert 'rel="noopener"' in docs_a
+
     assert 'Events' in html
     assert 'Terms' in html
     assert 'Documentation' in html

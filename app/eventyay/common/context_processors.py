@@ -13,6 +13,7 @@ from django_scopes import get_scope
 
 from eventyay.base.meetup import has_video_stream, is_meetup_event
 from eventyay.base.models.settings import GlobalSettings
+from eventyay.base.settings import GlobalSettingsObject
 from eventyay.cfp.signals import footer_link, html_head
 from eventyay.helpers.formats.variants import get_day_month_date_format
 from eventyay.helpers.i18n import get_javascript_format, get_moment_locale, is_rtl
@@ -148,8 +149,6 @@ def system_information(request):
             context['html_head'] = ''.join(_head)
 
     # Load core platform footer links from GlobalSettings
-    from eventyay.base.settings import GlobalSettingsObject
-
     gs = GlobalSettingsObject().settings
     core_footer_items = [
         ('events', _('Events'), '/upcoming'),

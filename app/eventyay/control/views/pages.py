@@ -12,7 +12,10 @@ from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.generic import FormView, ListView, TemplateView, UpdateView
 
+from i18nfield.strings import LazyI18nString
+
 from eventyay.base.models.page import Page
+from eventyay.base.settings import GlobalSettingsObject
 from eventyay.base.templatetags.rich_text import compile_markdown
 from eventyay.control.forms.page import PageSettingsForm
 from eventyay.control.permissions import AdministratorPermissionRequiredMixin
@@ -221,8 +224,6 @@ class SystemPageView(ShowPageView):
         try:
             return Page.objects.get(slug=slug)
         except Page.DoesNotExist:
-            from eventyay.base.settings import GlobalSettingsObject
-
             gs = GlobalSettingsObject().settings
             enabled_key = f'footer_link_{slug}_enabled'
             if gs.get(enabled_key, as_type=bool, default=True):
@@ -232,8 +233,6 @@ class SystemPageView(ShowPageView):
                     'pricing': _('Pricing'),
                     'support': _('Support & Help'),
                 }
-                from i18nfield.strings import LazyI18nString
-
                 title = title_map.get(slug, slug.capitalize())
                 custom_text = gs.get(f'footer_page_{slug}_text', as_type=LazyI18nString)
                 text = custom_text if custom_text else f'# {title}\n\n' + str(_('Content for this page has not been configured yet.'))
