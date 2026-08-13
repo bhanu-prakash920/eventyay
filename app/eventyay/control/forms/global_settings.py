@@ -46,35 +46,23 @@ class GlobalSettingsForm(SettingsForm):
             self.obj.settings.set('email_vendor', 'smtp')
 
         # Core platform footer link defaults
-        if global_settings.get('footer_link_events_enabled') is None:
-            global_settings.set('footer_link_events_enabled', True)
-        if global_settings.get('footer_link_events_url') is None:
-            global_settings.set('footer_link_events_url', '/upcoming')
-
-        if global_settings.get('footer_link_terms_enabled') is None:
-            global_settings.set('footer_link_terms_enabled', True)
-        if global_settings.get('footer_link_terms_url') is None:
-            global_settings.set('footer_link_terms_url', '/terms')
-
-        if global_settings.get('footer_link_privacy_enabled') is None:
-            global_settings.set('footer_link_privacy_enabled', True)
-        if global_settings.get('footer_link_privacy_url') is None:
-            global_settings.set('footer_link_privacy_url', '/privacy')
-
-        if global_settings.get('footer_link_pricing_enabled') is None:
-            global_settings.set('footer_link_pricing_enabled', True)
-        if global_settings.get('footer_link_pricing_url') is None:
-            global_settings.set('footer_link_pricing_url', '/pricing')
-
-        if global_settings.get('footer_link_documentation_enabled') is None:
-            global_settings.set('footer_link_documentation_enabled', True)
-        if global_settings.get('footer_link_documentation_url') is None:
-            global_settings.set('footer_link_documentation_url', 'https://docs.eventyay.com')
-
-        if global_settings.get('footer_link_support_enabled') is None:
-            global_settings.set('footer_link_support_enabled', True)
-        if global_settings.get('footer_link_support_url') is None:
-            global_settings.set('footer_link_support_url', '/support')
+        footer_defaults = {
+            'footer_link_events_enabled': True,
+            'footer_link_events_url': '/upcoming',
+            'footer_link_terms_enabled': True,
+            'footer_link_terms_url': '/terms',
+            'footer_link_privacy_enabled': True,
+            'footer_link_privacy_url': '/privacy',
+            'footer_link_pricing_enabled': True,
+            'footer_link_pricing_url': '/pricing',
+            'footer_link_documentation_enabled': True,
+            'footer_link_documentation_url': 'https://docs.eventyay.com',
+            'footer_link_support_enabled': True,
+            'footer_link_support_url': '/support',
+        }
+        for key, default_val in footer_defaults.items():
+            if global_settings.get(key) is None:
+                global_settings.set(key, default_val)
 
     def __init__(self, *args, **kwargs):
         self.obj = GlobalSettingsObject()
