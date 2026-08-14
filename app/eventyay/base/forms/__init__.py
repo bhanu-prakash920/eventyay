@@ -260,9 +260,13 @@ class I18nMarkdownTextarea(i18nfield.forms.I18nTextarea):
         output = []
         id_ = attrs.get('id') if attrs else None
         lang_dict = dict(settings.LANGUAGES)
+        enabled = getattr(self, 'enabled_locales', self.locales) or self.locales
 
         for i, widget in enumerate(self.widgets):
             locale_code = self.locales[i]
+            if locale_code not in enabled:
+                continue
+
             human_locale_name = str(lang_dict.get(locale_code, locale_code))
             widget_value = value.get(locale_code, '') if isinstance(value, dict) else ''
 
@@ -275,7 +279,7 @@ class I18nMarkdownTextarea(i18nfield.forms.I18nTextarea):
             textarea_html = widget.render(f'{name}_{i}', widget_value, final_attrs_widget, renderer=renderer)
 
             wrapped_html = f'''
-            <div class="i18n-textarea-wrapper">
+            <div class="i18n-textarea-wrapper" data-lang="{escape(locale_code)}">
                 <div class="i18n-lang-header">
                     <span class="i18n-lang-name">{escape(human_locale_name)}</span>
                 </div>
@@ -284,7 +288,7 @@ class I18nMarkdownTextarea(i18nfield.forms.I18nTextarea):
             '''
             output.append(wrapped_html)
 
-        return mark_safe(f'<div class="i18n-form-group" id="{escape(id_) if id_ else ""}">{ "".join(output) }</div>')
+        return mark_safe(f'<div class="i18n-form-group" id="{escape(id_) if id_ else ""}">{  "".join(output) }</div>')
 
 
 class I18nAutoExpandingTextarea(i18nfield.forms.I18nTextarea):

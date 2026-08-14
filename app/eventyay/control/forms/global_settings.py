@@ -1,3 +1,4 @@
+import json
 from collections import OrderedDict
 from typing import List, Union
 
@@ -10,6 +11,7 @@ from i18nfield.forms import I18nFormField, I18nTextarea, I18nTextInput
 from eventyay.base.forms import I18nMarkdownTextarea, SecretKeySettingsField, SecretKeySettingsWidget, SettingsForm
 from eventyay.base.settings import EVENT_SERIES_CREATION_ENABLED, MEETUP_CREATION_ENABLED, GlobalSettingsObject
 from eventyay.base.signals import register_global_settings
+from eventyay.control.forms import MultipleLanguagesWidget
 
 
 class GlobalSettingsForm(SettingsForm):
@@ -64,9 +66,50 @@ class GlobalSettingsForm(SettingsForm):
             if global_settings.get(key) is None:
                 global_settings.set(key, default_val)
 
+        # Default page locales to English
+        if global_settings.get('page_locales') is None:
+            global_settings.set('page_locales', json.dumps(['en']))
+
     def __init__(self, *args, **kwargs):
         self.obj = GlobalSettingsObject()
         self._setting_default()
+
+        # Compute active page locales before super().__init__ so I18nFormMixin
+        # receives the correct locales and sets enabled_locales on widgets.
+        raw_page_locales = self.obj.settings.get('page_locales')
+        if isinstance(raw_page_locales, str):
+            try:
+                page_locales = json.loads(raw_page_locales)
+            except (json.JSONDecodeError, TypeError):
+                page_locales = ['en']
+        elif isinstance(raw_page_locales, list):
+            page_locales = raw_page_locales
+        else:
+            page_locales = ['en']
+
+        # Include any locale that already has saved content so translations
+        # are never silently hidden when editing.
+        page_content_keys = [
+            'footer_page_terms_text', 'footer_page_privacy_text',
+            'footer_page_pricing_text', 'footer_page_support_text',
+        ]
+        for content_key in page_content_keys:
+            raw = self.obj.settings.get(content_key)
+            if isinstance(raw, str):
+                try:
+                    parsed = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    parsed = None
+                if isinstance(parsed, dict):
+                    for lang, text in parsed.items():
+                        if text and lang not in page_locales:
+                            page_locales.append(lang)
+
+        # Store page_locales in settings so SettingsForm.__init__ picks it up
+        # via self.obj.settings.get('locales')
+        self.obj.settings.set('locales', page_locales)
+        self._page_locales = page_locales
+
         super().__init__(*args, obj=self.obj, **kwargs)
 
         smtp_select = [('sendgrid', _('SendGrid')), ('smtp', _('SMTP'))]
@@ -643,11 +686,30 @@ class GlobalSettingsForm(SettingsForm):
             ]
         )
 
+        # Add page language selector field
+        self.fields['page_locales'] = forms.MultipleChoiceField(
+            choices=settings.LANGUAGES,
+            widget=MultipleLanguagesWidget,
+            required=True,
+            label=_('Page languages'),
+            help_text=_(
+                'Select the languages for page content (Terms, Privacy, Pricing, Support). '
+                'Only selected languages will be shown for editing.'
+            ),
+        )
+        self.initial['page_locales'] = self._page_locales
+
+        # Apply enabled_locales to all I18nFormField widgets on this form
+        for k, field in self.fields.items():
+            if isinstance(field, I18nFormField):
+                field.widget.enabled_locales = self._page_locales
+
         self.field_groups = [
             ('basics', _('Basics'), [
                 'footer_text', 'footer_link', 'banner_message', 'banner_message_detail',
             ]),
             ('pages', _('Pages'), [
+                'page_locales',
                 'footer_link_events_enabled',
                 'footer_link_events_url',
                 'footer_link_terms_enabled',
@@ -744,6 +806,22 @@ class GlobalSettingsForm(SettingsForm):
 
 
         return data
+
+    def save(self):
+        # Persist page_locales under its own key before the base save runs.
+        page_locales = self.cleaned_data.get('page_locales', ['en'])
+        self.obj.settings.set('page_locales', json.dumps(page_locales))
+
+        # Remove the temporary 'locales' key that was set for I18nFormMixin,
+        # then let the base class save all other fields normally.
+        self.cleaned_data.pop('locales', None)
+        super().save()
+
+        # Clean up the temporary 'locales' setting injected for I18nFormMixin
+        try:
+            del self.obj.settings['locales']
+        except KeyError:
+            pass
 
 
 class UpdateSettingsForm(SettingsForm):
