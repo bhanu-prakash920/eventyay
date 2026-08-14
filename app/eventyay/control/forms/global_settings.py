@@ -805,6 +805,10 @@ class GlobalSettingsForm(SettingsForm):
         return data
 
     def save(self):
+        # Persist page_locales as JSON string
+        page_locales = self.cleaned_data.get('page_locales', ['en'])
+        self.obj.settings.set('page_locales', json.dumps(page_locales))
+
         # Remove temporary 'locales' key before base save
         self.cleaned_data.pop('locales', None)
         super().save()

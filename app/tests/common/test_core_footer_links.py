@@ -1,8 +1,8 @@
 import json
-import re
 from unittest.mock import MagicMock, patch
 
 import pytest
+from bs4 import BeautifulSoup
 from django import forms as dj_forms
 from django.template.loader import render_to_string
 
@@ -15,7 +15,7 @@ from eventyay.control.views.pages import SystemPageView
 
 
 def _make_mock_settings(stored=None):
-    # Mock settings store backing GlobalSettingsObject
+    # Mock settings store matching hierarkey get(key, default=None, as_type=None) signature
     data = dict(stored or {})
     mock_settings = MagicMock()
     mock_settings._parent = None
@@ -24,15 +24,34 @@ def _make_mock_settings(stored=None):
     mock_settings._h.attribute_name = 'settings'
     mock_settings._h.get_declared_type.return_value = str
 
-    def _get(key, **kwargs):
-        return data.get(key, kwargs.get('default'))
+    def _get(key, default=None, as_type=None, **kwargs):
+        val = data.get(key)
+        if val is None:
+            val = default if default is not None else kwargs.get('default')
+        target_type = as_type or kwargs.get('as_type')
+        if val is not None and target_type is not None:
+            if target_type is bool:
+                return val if isinstance(val, bool) else str(val).lower() in ('true', '1', 't')
+            if target_type is list:
+                if isinstance(val, str):
+                    try:
+                        return json.loads(val)
+                    except (json.JSONDecodeError, TypeError):
+                        return [val]
+                return list(val)
+            if target_type is str:
+                return str(val)
+            try:
+                return target_type(val)
+            except (ValueError, TypeError):
+                return val
+        return val
 
     def _set(key, value):
         data[key] = value
 
     def _delitem(*args):
-        key = args[-1]
-        data.pop(key, None)
+        data.pop(args[-1], None)
 
     mock_settings.get.side_effect = _get
     mock_settings.set.side_effect = _set
@@ -75,34 +94,43 @@ def test_page_locales_in_pages_field_group():
 
 
 def test_page_locales_defaults_to_english():
-    # Verify default page locales is English when none is saved
+    # Verify default page locales renders only English in textareas
     with patch('eventyay.control.forms.global_settings.GlobalSettingsObject') as mock_gso:
         mock_gso.return_value.settings = _make_mock_settings()
         form = GlobalSettingsForm()
-        assert form._page_locales == ['en']
+        assert form.initial.get('page_locales') == ['en']
+        html = form['footer_page_terms_text'].as_widget()
+        assert 'data-lang="en"' in html
+        assert 'data-lang="de"' not in html
 
 
 def test_page_locales_preserves_saved_value():
-    # Verify saved page locales are loaded into the form
+    # Verify saved page locales are loaded and rendered in textareas
     with patch('eventyay.control.forms.global_settings.GlobalSettingsObject') as mock_gso:
         mock_gso.return_value.settings = _make_mock_settings({
             'page_locales': json.dumps(['en', 'de']),
         })
         form = GlobalSettingsForm()
-        assert 'en' in form._page_locales
-        assert 'de' in form._page_locales
+        assert form.initial.get('page_locales') == ['en', 'de']
+        html = form['footer_page_terms_text'].as_widget()
+        assert 'data-lang="en"' in html
+        assert 'data-lang="de"' in html
+        assert 'data-lang="fr"' not in html
 
 
 def test_page_locales_auto_includes_existing_content_locales():
-    # Verify existing translations are auto-included in active locales
+    # Verify existing translations are auto-included in active locales and rendered
     with patch('eventyay.control.forms.global_settings.GlobalSettingsObject') as mock_gso:
         mock_gso.return_value.settings = _make_mock_settings({
             'page_locales': json.dumps(['en']),
             'footer_page_terms_text': json.dumps({'en': 'Terms', 'fr': 'Conditions'}),
         })
         form = GlobalSettingsForm()
-        assert 'en' in form._page_locales
-        assert 'fr' in form._page_locales
+        assert form.initial.get('page_locales') == ['en', 'fr']
+        html = form['footer_page_terms_text'].as_widget()
+        assert 'data-lang="en"' in html
+        assert 'data-lang="fr"' in html
+        assert 'data-lang="de"' not in html
 
 
 def test_global_settings_form_renders_only_enabled_locales():
@@ -119,16 +147,23 @@ def test_global_settings_form_renders_only_enabled_locales():
 
 
 def test_global_settings_form_save_persists_page_locales():
-    # Verify saving the form updates page_locales in settings
-    mock_settings = _make_mock_settings({'page_locales': ['en']})
+    # Verify full form validation and save cycle persists page_locales
+    mock_settings = _make_mock_settings({'page_locales': json.dumps(['en'])})
     with patch('eventyay.control.forms.global_settings.GlobalSettingsObject') as mock_gso:
         mock_gso.return_value.settings = mock_settings
-        form = GlobalSettingsForm()
-        form.cleaned_data = {name: form.initial.get(name, '') for name in form.fields}
-        form.cleaned_data['page_locales'] = ['en', 'de', 'es']
+        unbound = GlobalSettingsForm()
+        post_data = {k: unbound.initial.get(k, '') for k in unbound.fields}
+        post_data.update({
+            'page_locales': ['en', 'de', 'es'],
+            'email_vendor': 'smtp',
+            'reservation_time': 30,
+            'max_products_per_order': 0,
+        })
+        form = GlobalSettingsForm(data=post_data)
+        assert form.is_valid(), form.errors
         form.save()
         saved = mock_settings.get('page_locales')
-        assert saved == ['en', 'de', 'es']
+        assert (json.loads(saved) if isinstance(saved, str) else saved) == ['en', 'de', 'es']
 
 
 def test_i18n_markdown_textarea_respects_enabled_locales():
@@ -157,16 +192,43 @@ def test_context_processor_core_footer_links(rf):
     # Verify system_information context processor populates core footer links
     request = rf.get('/')
     with patch('eventyay.common.context_processors.GlobalSettingsObject') as mock_gso:
-        mock_settings = MagicMock()
-        mock_settings.get.side_effect = lambda k, **kwargs: (
-            True if 'enabled' in k else kwargs.get('default', '')
-        )
+        mock_settings = _make_mock_settings({
+            'footer_link_events_enabled': True,
+            'footer_link_terms_enabled': True,
+            'footer_link_privacy_enabled': True,
+            'footer_link_pricing_enabled': True,
+            'footer_link_documentation_enabled': True,
+            'footer_link_support_enabled': True,
+        })
         mock_gso.return_value.settings = mock_settings
         ctx = system_information(request)
         assert 'core_footer_links' in ctx
         keys = [link['key'] for link in ctx['core_footer_links']]
         for expected in ['events', 'terms', 'privacy', 'pricing', 'documentation', 'support']:
             assert expected in keys
+
+
+def test_context_processor_excludes_disabled_footer_links(rf):
+    # Verify disabled footer links are excluded from context processor output
+    request = rf.get('/')
+    with patch('eventyay.common.context_processors.GlobalSettingsObject') as mock_gso:
+        mock_settings = _make_mock_settings({
+            'footer_link_events_enabled': True,
+            'footer_link_terms_enabled': False,
+            'footer_link_privacy_enabled': True,
+            'footer_link_pricing_enabled': False,
+            'footer_link_documentation_enabled': True,
+            'footer_link_support_enabled': False,
+        })
+        mock_gso.return_value.settings = mock_settings
+        ctx = system_information(request)
+        keys = [link['key'] for link in ctx['core_footer_links']]
+        assert 'terms' not in keys
+        assert 'pricing' not in keys
+        assert 'support' not in keys
+        assert 'events' in keys
+        assert 'privacy' in keys
+        assert 'documentation' in keys
 
 
 def test_system_page_view_slug_handling():
@@ -195,10 +257,9 @@ def test_system_page_view_custom_content():
 
     with patch('eventyay.control.views.pages.Page.objects.get', side_effect=Page.DoesNotExist):
         with patch('eventyay.control.views.pages.GlobalSettingsObject') as mock_gso:
-            mock_settings = MagicMock()
-            mock_settings.get.side_effect = lambda k, **kwargs: (
-                '# Custom Privacy Content' if k == 'footer_page_privacy_text' else True
-            )
+            mock_settings = _make_mock_settings({
+                'footer_page_privacy_text': '# Custom Privacy Content',
+            })
             mock_gso.return_value.settings = mock_settings
             page = view.get_page()
             assert page.title == 'Privacy Policy'
@@ -213,27 +274,42 @@ def test_core_footer_template_structure():
         {'key': 'documentation', 'label': 'Documentation', 'url': 'https://docs.eventyay.com', 'target_blank': True},
     ]
     html = render_to_string('common/includes/core_footer.html', {'core_footer_links': sample_links})
+    soup = BeautifulSoup(html, 'html.parser')
 
-    assert 'core-footer-nav' in html
-    assert 'core-footer-links-container' in html
+    assert soup.find('nav', class_='core-footer-nav') is not None
+    assert soup.find('div', class_='core-footer-links-container') is not None
 
-    def anchor_for(fragment):
-        match = re.search(rf'<a[^>]*href="[^"]*{re.escape(fragment)}[^"]*"[^>]*>', html)
-        assert match, f'no anchor found containing {fragment!r}'
-        return match.group()
+    events_a = soup.find('a', href=lambda h: h and 'upcoming' in h)
+    assert events_a is not None
+    assert events_a.get_text(strip=True) == 'Events'
+    assert events_a.get('target') != '_blank'
 
-    # Internal links must not open in new tab
-    events_a = anchor_for('upcoming')
-    assert 'target="_blank"' not in events_a
+    terms_a = soup.find('a', href=lambda h: h and 'terms' in h)
+    assert terms_a is not None
+    assert terms_a.get_text(strip=True) == 'Terms'
+    assert terms_a.get('target') != '_blank'
 
-    terms_a = anchor_for('terms')
-    assert 'target="_blank"' not in terms_a
+    docs_a = soup.find('a', href=lambda h: h and 'docs.eventyay.com' in h)
+    assert docs_a is not None
+    assert docs_a.get_text(strip=True) == 'Documentation'
+    assert docs_a.get('target') == '_blank'
+    rel = docs_a.get('rel', [])
+    assert 'noopener' in (rel if isinstance(rel, list) else rel.split())
 
-    # External links must open in new tab with rel="noopener"
-    docs_a = anchor_for('docs.eventyay.com')
-    assert 'target="_blank"' in docs_a
-    assert 'rel="noopener"' in docs_a
 
-    assert 'Events' in html
-    assert 'Terms' in html
-    assert 'Documentation' in html
+def test_footer_context_renders_correctly(rf):
+    # Verify template renders correctly from real context processor output
+    request = rf.get('/')
+    with patch('eventyay.common.context_processors.GlobalSettingsObject') as mock_gso:
+        mock_settings = _make_mock_settings({
+            'footer_link_events_enabled': True,
+            'footer_link_terms_enabled': True,
+            'footer_link_documentation_enabled': True,
+        })
+        mock_gso.return_value.settings = mock_settings
+        ctx = system_information(request)
+        html = render_to_string('common/includes/core_footer.html', ctx)
+        soup = BeautifulSoup(html, 'html.parser')
+        assert soup.find('a', href=lambda h: h and 'upcoming' in h) is not None
+        assert soup.find('a', href=lambda h: h and 'terms' in h) is not None
+        assert soup.find('a', href=lambda h: h and 'docs.eventyay.com' in h) is not None
