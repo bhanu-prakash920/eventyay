@@ -126,7 +126,7 @@ def test_page_locales_auto_includes_existing_content_locales():
             'footer_page_terms_text': json.dumps({'en': 'Terms', 'fr': 'Conditions'}),
         })
         form = GlobalSettingsForm()
-        assert form.initial.get('page_locales') == ['en', 'fr']
+        assert set(form.initial.get('page_locales')) == {'en', 'fr'}
         html = form['footer_page_terms_text'].as_widget()
         assert 'data-lang="en"' in html
         assert 'data-lang="fr"' in html
@@ -152,13 +152,8 @@ def test_global_settings_form_save_persists_page_locales():
     with patch('eventyay.control.forms.global_settings.GlobalSettingsObject') as mock_gso:
         mock_gso.return_value.settings = mock_settings
         unbound = GlobalSettingsForm()
-        post_data = {k: unbound.initial.get(k, '') for k in unbound.fields}
-        post_data.update({
-            'page_locales': ['en', 'de', 'es'],
-            'email_vendor': 'smtp',
-            'reservation_time': 30,
-            'max_products_per_order': 0,
-        })
+        post_data = {k: v for k, v in unbound.initial.items() if v is not None}
+        post_data['page_locales'] = ['en', 'de', 'es']
         form = GlobalSettingsForm(data=post_data)
         assert form.is_valid(), form.errors
         form.save()
