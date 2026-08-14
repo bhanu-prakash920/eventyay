@@ -1,15 +1,6 @@
-/**
- * Global Settings Pages tab – reactive language visibility.
- *
- * When the admin selects or deselects languages in the MultipleLanguagesWidget
- * (page_locales), this module dynamically shows or hides the corresponding
- * `.i18n-textarea-wrapper[data-lang]` elements across all markdown fields.
- *
- * ES module, no jQuery, no inline scripts — CSP compliant.
- */
+// Sync i18n textarea visibility with selected page languages.
 
-function getPageLocalesWidget() {
-  // The MultipleLanguagesWidget renders checkboxes with name="page_locales"
+function getPageLocalesCheckboxes() {
   return document.querySelectorAll('input[type="checkbox"][name="page_locales"]');
 }
 
@@ -27,28 +18,28 @@ function syncTextareaVisibility(selectedLocales) {
   const wrappers = document.querySelectorAll('.i18n-textarea-wrapper[data-lang]');
   wrappers.forEach((wrapper) => {
     const lang = wrapper.getAttribute('data-lang');
-    if (selectedLocales.includes(lang)) {
-      wrapper.style.display = '';
+    const isVisible = selectedLocales.includes(lang);
+    wrapper.style.display = isVisible ? '' : 'none';
+    if (isVisible) {
       wrapper.removeAttribute('hidden');
     } else {
-      wrapper.style.display = 'none';
       wrapper.setAttribute('hidden', '');
     }
   });
 }
 
 function init() {
-  const checkboxes = getPageLocalesWidget();
+  const checkboxes = getPageLocalesCheckboxes();
   if (checkboxes.length === 0) return;
 
-  // Listen for change events on the language grid checkboxes
+  // React to checkbox changes
   checkboxes.forEach((cb) => {
     cb.addEventListener('change', () => {
       syncTextareaVisibility(getSelectedLocales(checkboxes));
     });
   });
 
-  // Initial sync on page load
+  // Initial visibility sync
   syncTextareaVisibility(getSelectedLocales(checkboxes));
 }
 
@@ -58,5 +49,5 @@ if (document.readyState === 'loading') {
   init();
 }
 
-// Re-run after full load to catch any late-rendered widgets
+// Ensure sync after full window load
 window.addEventListener('load', init);
