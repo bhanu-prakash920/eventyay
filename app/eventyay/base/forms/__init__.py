@@ -260,13 +260,8 @@ class I18nMarkdownTextarea(i18nfield.forms.I18nTextarea):
         output = []
         id_ = attrs.get('id') if attrs else None
         lang_dict = dict(settings.LANGUAGES)
-        enabled = getattr(self, 'enabled_locales', self.locales) or self.locales
-
         for i, widget in enumerate(self.widgets):
             locale_code = self.locales[i]
-            if locale_code not in enabled:
-                continue
-
             human_locale_name = str(lang_dict.get(locale_code, locale_code))
             widget_value = value.get(locale_code, '') if isinstance(value, dict) else ''
 

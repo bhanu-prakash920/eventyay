@@ -1,53 +1,63 @@
-// Sync i18n textarea visibility with selected page languages.
+/* Real-time synchronization of page content fields with page_locales language selector. */
 
-function getPageLocalesCheckboxes() {
-  return document.querySelectorAll('input[type="checkbox"][name="page_locales"]');
-}
-
-function getSelectedLocales(checkboxes) {
-  const selected = [];
-  checkboxes.forEach((cb) => {
-    if (cb.checked) {
-      selected.push(cb.value);
+(() => {
+    function getSelectedLocales() {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"][name="page_locales"]:checked');
+        const selected = Array.from(checkboxes).map((cb) => cb.value.toLowerCase());
+        return selected.length > 0 ? selected : ['en'];
     }
-  });
-  return selected;
-}
 
-function syncTextareaVisibility(selectedLocales) {
-  const wrappers = document.querySelectorAll('.i18n-textarea-wrapper[data-lang]');
-  wrappers.forEach((wrapper) => {
-    const lang = wrapper.getAttribute('data-lang');
-    const isVisible = selectedLocales.includes(lang);
-    wrapper.style.display = isVisible ? '' : 'none';
-    if (isVisible) {
-      wrapper.removeAttribute('hidden');
+    function syncTextareaVisibility() {
+        const selected = getSelectedLocales();
+        const wrappers = document.querySelectorAll('.i18n-textarea-wrapper[data-lang]');
+
+        wrappers.forEach((wrapper) => {
+            const lang = (wrapper.getAttribute('data-lang') || '').toLowerCase();
+            const isVisible = selected.includes(lang);
+
+            wrapper.style.display = isVisible ? '' : 'none';
+            if (isVisible) {
+                wrapper.removeAttribute('hidden');
+            } else {
+                wrapper.setAttribute('hidden', '');
+            }
+        });
+    }
+
+    function init() {
+        syncTextareaVisibility();
+
+        // Listen for checkbox changes on page_locales
+        document.addEventListener('change', (e) => {
+            if (e.target && e.target.name === 'page_locales') {
+                syncTextareaVisibility();
+            }
+        });
+
+        // Handle clicks on language grid badges, cells, and toolbar buttons
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.closest('.language-grid-widget')) {
+                setTimeout(syncTextareaVisibility, 50);
+            }
+        });
+
+        // Handle Bootstrap tab changes
+        document.addEventListener('shown.bs.tab', syncTextareaVisibility);
+
+        // MutationObserver for dynamic language grid updates
+        const gridWidget = document.querySelector('.language-grid-widget');
+        if (gridWidget && window.MutationObserver) {
+            const observer = new MutationObserver(() => syncTextareaVisibility());
+            observer.observe(gridWidget, { subtree: true, attributes: true, attributeFilter: ['checked', 'class'] });
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-      wrapper.setAttribute('hidden', '');
+        init();
     }
-  });
-}
 
-function init() {
-  const checkboxes = getPageLocalesCheckboxes();
-  if (checkboxes.length === 0) return;
-
-  // React to checkbox changes
-  checkboxes.forEach((cb) => {
-    cb.addEventListener('change', () => {
-      syncTextareaVisibility(getSelectedLocales(checkboxes));
-    });
-  });
-
-  // Initial visibility sync
-  syncTextareaVisibility(getSelectedLocales(checkboxes));
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
-}
-
-// Ensure sync after full window load
-window.addEventListener('load', init);
+    window.addEventListener('eventyay:toastui-ready', syncTextareaVisibility);
+    window.addEventListener('load', syncTextareaVisibility);
+})();

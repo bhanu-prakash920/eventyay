@@ -94,32 +94,25 @@ def test_page_locales_in_pages_field_group():
 
 
 def test_page_locales_defaults_to_english():
-    # Verify default page locales renders only English in textareas
+    # Verify default page locales sets initial to English
     with patch('eventyay.control.forms.global_settings.GlobalSettingsObject') as mock_gso:
         mock_gso.return_value.settings = _make_mock_settings()
         form = GlobalSettingsForm()
         assert form.initial.get('page_locales') == ['en']
-        html = form['footer_page_terms_text'].as_widget()
-        assert 'data-lang="en"' in html
-        assert 'data-lang="de"' not in html
 
 
 def test_page_locales_preserves_saved_value():
-    # Verify saved page locales are loaded and rendered in textareas
+    # Verify saved page locales are loaded into form initial
     with patch('eventyay.control.forms.global_settings.GlobalSettingsObject') as mock_gso:
         mock_gso.return_value.settings = _make_mock_settings({
             'page_locales': json.dumps(['en', 'de']),
         })
         form = GlobalSettingsForm()
         assert form.initial.get('page_locales') == ['en', 'de']
-        html = form['footer_page_terms_text'].as_widget()
-        assert 'data-lang="en"' in html
-        assert 'data-lang="de"' in html
-        assert 'data-lang="fr"' not in html
 
 
 def test_page_locales_auto_includes_existing_content_locales():
-    # Verify existing translations are auto-included in active locales and rendered
+    # Verify existing translations are auto-included in page locales initial
     with patch('eventyay.control.forms.global_settings.GlobalSettingsObject') as mock_gso:
         mock_gso.return_value.settings = _make_mock_settings({
             'page_locales': json.dumps(['en']),
@@ -127,23 +120,6 @@ def test_page_locales_auto_includes_existing_content_locales():
         })
         form = GlobalSettingsForm()
         assert set(form.initial.get('page_locales')) == {'en', 'fr'}
-        html = form['footer_page_terms_text'].as_widget()
-        assert 'data-lang="en"' in html
-        assert 'data-lang="fr"' in html
-        assert 'data-lang="de"' not in html
-
-
-def test_global_settings_form_renders_only_enabled_locales():
-    # Verify form widget HTML output renders only enabled languages
-    with patch('eventyay.control.forms.global_settings.GlobalSettingsObject') as mock_gso:
-        mock_gso.return_value.settings = _make_mock_settings({
-            'page_locales': json.dumps(['en', 'de']),
-        })
-        form = GlobalSettingsForm()
-        html = form['footer_page_terms_text'].as_widget()
-        assert 'data-lang="en"' in html
-        assert 'data-lang="de"' in html
-        assert 'data-lang="fr"' not in html
 
 
 def test_global_settings_form_save_persists_page_locales():
@@ -161,26 +137,17 @@ def test_global_settings_form_save_persists_page_locales():
         assert (json.loads(saved) if isinstance(saved, str) else saved) == ['en', 'de', 'es']
 
 
-def test_i18n_markdown_textarea_respects_enabled_locales():
-    # Verify widget rendering filters out non-enabled locales
+def test_i18n_markdown_textarea_renders_all_locales_with_headers():
+    # Verify widget renders all configured locales with language headers above fields
     field = dj_forms.CharField()
     widget = I18nMarkdownTextarea(locales=['en', 'de', 'fr'], field=field)
-    widget.enabled_locales = ['en', 'fr']
 
     html = widget.render('test_field', {'en': 'Hello', 'de': 'Hallo', 'fr': 'Bonjour'}, attrs={'id': 'id_test'})
     assert 'data-lang="en"' in html
-    assert 'data-lang="fr"' in html
-    assert 'data-lang="de"' not in html
-
-
-def test_i18n_markdown_textarea_renders_all_when_no_filter():
-    # Verify widget renders all configured locales when all are enabled
-    field = dj_forms.CharField()
-    widget = I18nMarkdownTextarea(locales=['en', 'de'], field=field)
-
-    html = widget.render('test_field', {'en': 'Hello', 'de': 'Hallo'}, attrs={'id': 'id_test'})
-    assert 'data-lang="en"' in html
     assert 'data-lang="de"' in html
+    assert 'data-lang="fr"' in html
+    assert 'class="i18n-lang-header"' in html
+    assert 'class="i18n-lang-name"' in html
 
 
 def test_context_processor_core_footer_links(rf):

@@ -696,11 +696,6 @@ class GlobalSettingsForm(SettingsForm):
         )
         self.initial['page_locales'] = self._page_locales
 
-        # Filter I18n widgets to selected page locales
-        for k, field in self.fields.items():
-            if isinstance(field, I18nFormField):
-                field.widget.enabled_locales = self._page_locales
-
         self.field_groups = [
             ('basics', _('Basics'), [
                 'footer_text', 'footer_link', 'banner_message', 'banner_message_detail',
