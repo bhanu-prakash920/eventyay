@@ -1,7 +1,6 @@
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 from bs4 import BeautifulSoup
 from django import forms as dj_forms
 from django.template.loader import render_to_string
@@ -137,8 +136,8 @@ def test_global_settings_form_save_persists_page_locales():
         assert (json.loads(saved) if isinstance(saved, str) else saved) == ['en', 'de', 'es']
 
 
-def test_i18n_markdown_textarea_renders_all_locales_with_headers():
-    # Verify widget renders all configured locales with language headers above fields
+def test_i18n_markdown_textarea_renders_all_locales():
+    # Verify widget renders all configured locales with data-lang attributes
     field = dj_forms.CharField()
     widget = I18nMarkdownTextarea(locales=['en', 'de', 'fr'], field=field)
 
@@ -146,8 +145,8 @@ def test_i18n_markdown_textarea_renders_all_locales_with_headers():
     assert 'data-lang="en"' in html
     assert 'data-lang="de"' in html
     assert 'data-lang="fr"' in html
-    assert 'class="i18n-lang-header"' in html
-    assert 'class="i18n-lang-name"' in html
+    assert 'placeholder="English"' in html
+    assert 'placeholder="German"' in html
 
 
 def test_context_processor_core_footer_links(rf):

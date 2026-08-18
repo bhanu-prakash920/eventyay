@@ -275,9 +275,6 @@ class I18nMarkdownTextarea(i18nfield.forms.I18nTextarea):
 
             wrapped_html = f'''
             <div class="i18n-textarea-wrapper" data-lang="{escape(locale_code)}">
-                <div class="i18n-lang-header">
-                    <span class="i18n-lang-name">{escape(human_locale_name)}</span>
-                </div>
                 {textarea_html}
             </div>
             '''
