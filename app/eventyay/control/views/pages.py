@@ -17,8 +17,10 @@ from i18nfield.strings import LazyI18nString
 from eventyay.base.models.page import Page
 from eventyay.base.settings import GlobalSettingsObject
 from eventyay.base.templatetags.rich_text import compile_markdown
+from eventyay.common.permissions import is_admin_mode_active
 from eventyay.control.forms.page import PageSettingsForm
 from eventyay.control.permissions import AdministratorPermissionRequiredMixin
+from eventyay.eventyay_common.navigation import get_global_navigation
 from eventyay.helpers.compat import CompatDeleteView
 
 
@@ -188,6 +190,8 @@ class ShowPageView(TemplateView):
         ctx = super().get_context_data()
         page = self.get_page()
         ctx['page'] = page
+        ctx['staff_session'] = is_admin_mode_active(self.request)
+        ctx['nav_items'] = get_global_navigation(self.request) if self.request.user.is_authenticated else []
         ctx['show_link_in_header_for_all_pages'] = Page.objects.filter(link_in_system=True, link_in_header=True)
         ctx['show_link_in_footer_for_all_pages'] = Page.objects.filter(link_in_system=True, link_in_footer=True)
 

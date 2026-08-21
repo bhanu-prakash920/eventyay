@@ -1,8 +1,11 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
 from bs4 import BeautifulSoup
 from django import forms as dj_forms
+from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.template.loader import render_to_string
 
 from eventyay.base.forms import I18nMarkdownTextarea
@@ -274,3 +277,61 @@ def test_footer_context_renders_correctly(rf):
         assert soup.find('a', href=lambda h: h and 'upcoming' in h) is not None
         assert soup.find('a', href=lambda h: h and 'terms' in h) is not None
         assert soup.find('a', href=lambda h: h and 'docs.eventyay.com' in h) is not None
+
+
+def test_public_pages_base_template_unauthenticated(rf):
+    # Verify public page shell renders language switcher, login link, and no sidebar for guests
+    request = rf.get('/terms/')
+    request.user = AnonymousUser()
+    request.LANGUAGE_CODE = 'en'
+
+    context = {
+        'request': request,
+        'page': MagicMock(title='Terms of Service'),
+        'content': '<p>Terms content</p>',
+        'nav_items': [],
+        'staff_session': False,
+        'language_options': [{'code': 'en', 'label': 'English'}, {'code': 'de', 'label': 'Deutsch'}],
+        'core_footer_links': [],
+        'django_settings': settings,
+    }
+    html = render_to_string('pretixcontrol/admin/pages/show.html', context)
+    soup = BeautifulSoup(html, 'html.parser')
+
+    assert soup.find('details', id='language-dropdown') is not None
+    assert soup.find('a', href=lambda h: h and 'login' in h) is not None
+    assert soup.find('details', id='profile-dropdown') is None
+    assert soup.find('aside', id='startpage-sidebar') is None
+
+
+def test_public_pages_base_template_authenticated(rf):
+    # Verify public page shell renders language switcher, profile dropdown, and sidebar for logged-in users
+    request = rf.get('/terms/')
+    user = MagicMock(is_authenticated=True, is_staff=False, email='user@eventyay.com', fullname='Test User')
+    request.user = user
+    request.LANGUAGE_CODE = 'en'
+
+    nav_items = [
+        {'label': 'My Orders', 'url': '/common/orders/', 'active': False, 'icon': 'shopping-cart'},
+        {'label': 'My Events', 'url': '/common/events/', 'active': False, 'icon': 'calendar'},
+    ]
+    context = {
+        'request': request,
+        'page': MagicMock(title='Terms of Service'),
+        'content': '<p>Terms content</p>',
+        'nav_items': nav_items,
+        'staff_session': False,
+        'language_options': [{'code': 'en', 'label': 'English'}, {'code': 'de', 'label': 'Deutsch'}],
+        'core_footer_links': [],
+        'django_settings': settings,
+    }
+    html = render_to_string('pretixcontrol/admin/pages/show.html', context)
+    soup = BeautifulSoup(html, 'html.parser')
+
+    assert soup.find('details', id='language-dropdown') is not None
+    assert soup.find('details', id='profile-dropdown') is not None
+    assert soup.find('button', id='sidebar-toggle') is not None
+    sidebar = soup.find('aside', id='startpage-sidebar')
+    assert sidebar is not None
+    assert soup.find('a', href=lambda h: h and '/common/orders/' in h) is not None
+
