@@ -353,3 +353,44 @@ def test_public_pages_base_template_authenticated(rf):
     assert sidebar is not None
     assert soup.find('a', href=lambda h: h and '/common/orders/' in h) is not None
 
+
+def test_global_settings_page_preview_form_encoded(rf):
+    from eventyay.control.views.global_settings import GlobalSettingsPagePreviewView
+    view = GlobalSettingsPagePreviewView.as_view()
+    user = MagicMock(is_authenticated=True, is_staff=True, is_administrator=True, is_active=True, has_active_staff_session=MagicMock(return_value=True))
+    request = rf.post(
+        '/admin/global/settings/preview/',
+        data={'body_en': '<p>Hello <strong>World</strong><script>alert(1)</script></p>', 'body_de': '<p>Hallo</p>'},
+    )
+    request.user = user
+    request.session = MagicMock(session_key='test_session_key')
+
+    response = view(request)
+    assert response.status_code == 200
+    data = json.loads(response.content)
+    assert 'previews' in data
+    assert '<strong>World</strong>' in data['previews']['en']
+    assert '<script>' not in data['previews']['en']
+    assert '<p>Hallo</p>' in data['previews']['de']
+
+
+def test_global_settings_page_preview_json_payload(rf):
+    from eventyay.control.views.global_settings import GlobalSettingsPagePreviewView
+    view = GlobalSettingsPagePreviewView.as_view()
+    user = MagicMock(is_authenticated=True, is_staff=True, is_administrator=True, is_active=True, has_active_staff_session=MagicMock(return_value=True))
+    request = rf.post(
+        '/admin/global/settings/preview/',
+        data=json.dumps({'html': '<p>Preview text <script>bad()</script></p>'}),
+        content_type='application/json',
+    )
+    request.user = user
+    request.session = MagicMock(session_key='test_session_key')
+
+    response = view(request)
+    assert response.status_code == 200
+    data = json.loads(response.content)
+    assert 'html' in data
+    assert '<p>Preview text </p>' in data['html']
+    assert '<script>' not in data['html']
+
+
