@@ -8,9 +8,10 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils.translation import gettext_lazy as _
 from i18nfield.forms import I18nFormField, I18nTextarea, I18nTextInput
 
-from eventyay.base.forms import I18nMarkdownTextarea, SecretKeySettingsField, SecretKeySettingsWidget, SettingsForm
+from eventyay.base.forms import SecretKeySettingsField, SecretKeySettingsWidget, SettingsForm
 from eventyay.base.settings import EVENT_SERIES_CREATION_ENABLED, MEETUP_CREATION_ENABLED, GlobalSettingsObject
 from eventyay.base.signals import register_global_settings
+from eventyay.common.forms.fields import I18nRichTextFormField
 from eventyay.control.forms import MultipleLanguagesWidget
 
 
@@ -643,41 +644,37 @@ class GlobalSettingsForm(SettingsForm):
                         required=False,
                     ),
                 ),
-                # Page HTML/Markdown content fields
+                # Page rich text content fields
                 (
                     'footer_page_terms_text',
-                    I18nFormField(
-                        widget=I18nMarkdownTextarea,
+                    I18nRichTextFormField(
                         required=False,
                         label=_('"Terms of Service" page content'),
-                        help_text=_('HTML or Markdown content for the /terms page.'),
+                        help_text=_('Rich text content for the /terms page.'),
                     ),
                 ),
                 (
                     'footer_page_privacy_text',
-                    I18nFormField(
-                        widget=I18nMarkdownTextarea,
+                    I18nRichTextFormField(
                         required=False,
                         label=_('"Privacy Policy" page content'),
-                        help_text=_('HTML or Markdown content for the /privacy page.'),
+                        help_text=_('Rich text content for the /privacy page.'),
                     ),
                 ),
                 (
                     'footer_page_pricing_text',
-                    I18nFormField(
-                        widget=I18nMarkdownTextarea,
+                    I18nRichTextFormField(
                         required=False,
                         label=_('"Pricing" page content'),
-                        help_text=_('HTML or Markdown content for the /pricing page.'),
+                        help_text=_('Rich text content for the /pricing page.'),
                     ),
                 ),
                 (
                     'footer_page_support_text',
-                    I18nFormField(
-                        widget=I18nMarkdownTextarea,
+                    I18nRichTextFormField(
                         required=False,
                         label=_('"Support" page content'),
-                        help_text=_('HTML or Markdown content for the /support page.'),
+                        help_text=_('Rich text content for the /support page.'),
                     ),
                 ),
             ]

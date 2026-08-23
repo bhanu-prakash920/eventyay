@@ -11,6 +11,8 @@ from django.template.loader import render_to_string
 from eventyay.base.forms import I18nMarkdownTextarea
 from eventyay.base.models.page import Page
 from eventyay.common.context_processors import system_information
+from eventyay.common.forms.fields import I18nRichTextFormField
+from eventyay.common.forms.widgets import I18nRichTextWidget
 from eventyay.control.forms import MultipleLanguagesWidget
 from eventyay.control.forms.global_settings import GlobalSettingsForm
 from eventyay.control.views.pages import SystemPageView
@@ -72,7 +74,10 @@ def test_global_settings_form_footer_defaults():
             assert f'footer_link_{key}_enabled' in form.fields
             assert f'footer_link_{key}_url' in form.fields
         for page_key in ['terms', 'privacy', 'pricing', 'support']:
-            assert f'footer_page_{page_key}_text' in form.fields
+            field_name = f'footer_page_{page_key}_text'
+            assert field_name in form.fields
+            assert isinstance(form.fields[field_name], I18nRichTextFormField)
+            assert isinstance(form.fields[field_name].widget, I18nRichTextWidget)
 
 
 def test_global_settings_form_has_page_locales_field():
@@ -139,17 +144,30 @@ def test_global_settings_form_save_persists_page_locales():
         assert (json.loads(saved) if isinstance(saved, str) else saved) == ['en', 'de', 'es']
 
 
-def test_i18n_markdown_textarea_renders_all_locales():
-    # Verify widget renders all configured locales with data-lang attributes
+def test_i18n_richtext_widget_renders_all_locales():
+    # Verify widget renders all configured locales with data-lang, tiptap wrapper and profile
     field = dj_forms.CharField()
-    widget = I18nMarkdownTextarea(locales=['en', 'de', 'fr'], field=field)
+    widget = I18nRichTextWidget(locales=['en', 'de', 'fr'], field=field)
 
-    html = widget.render('test_field', {'en': 'Hello', 'de': 'Hallo', 'fr': 'Bonjour'}, attrs={'id': 'id_test'})
+    html = widget.render('test_field', {'en': '<p>Hello</p>', 'de': '<p>Hallo</p>', 'fr': '<p>Bonjour</p>'}, attrs={'id': 'id_test'})
     assert 'data-lang="en"' in html
     assert 'data-lang="de"' in html
     assert 'data-lang="fr"' in html
-    assert 'placeholder="English"' in html
-    assert 'placeholder="German"' in html
+    assert 'data-tiptap-wrapper="true"' in html
+    assert 'data-tiptap-profile="richtext"' in html
+    assert 'id="id_test_0"' in html
+    assert 'id="id_test_1"' in html
+    assert 'id="id_test_2"' in html
+
+
+def test_i18n_richtext_form_field_sanitizes():
+    # Verify I18nRichTextFormField sanitizes malicious HTML tags
+    from i18nfield.strings import LazyI18nString
+    field = I18nRichTextFormField(locales=['en', 'de'], required=False)
+    result = field.clean(['<p>Terms</p><script>alert(1)</script>', '<p>Bedingungen</p>'])
+    assert isinstance(result, LazyI18nString)
+    assert result.data['en'] == '<p>Terms</p>'
+    assert result.data['de'] == '<p>Bedingungen</p>'
 
 
 def test_context_processor_core_footer_links(rf):
