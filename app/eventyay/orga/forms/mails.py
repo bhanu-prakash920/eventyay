@@ -173,7 +173,10 @@ class MailDetailForm(ScheduledAtValidationMixin, ReadOnlyFlag, forms.ModelForm):
         if not self.instance or not self.instance.to_users.all().count():
             self.fields.pop('to_users')
         else:
-            self.fields['to_users'].queryset = self.instance.event.submitters.all()
+            self.fields['to_users'].queryset = User.objects.filter(
+                Q(submissions__in=self.instance.event.submissions.all())
+                | Q(teams__in=self.instance.event.teams.all())
+            ).distinct()
             self.fields['to_users'].required = False
 
     def clean(self, *args, **kwargs):
@@ -307,7 +310,11 @@ class WriteTeamsMailForm(WriteMailBaseForm):
     def get_recipients(self):
         recipients = self.cleaned_data.get('recipients')
         teams = self.event.teams.all().filter(pk__in=recipients)
-        return User.objects.filter(is_active=True, teams__in=teams)
+        return (
+            User.objects.filter(is_active=True, teams__in=teams, email__isnull=False)
+            .exclude(email='')
+            .distinct()
+        )
 
     @transaction.atomic
     def save(self):
@@ -318,14 +325,18 @@ class WriteTeamsMailForm(WriteMailBaseForm):
             # This happens when there are template errors
             with suppress(SendMailException):
                 mail = send_template.to_mail(
-                    user=user,
+                    user=None,
                     event=self.event,
                     locale=user.locale,
                     context_kwargs={'user': user, 'event': self.event},
-                    skip_queue=True,
+                    skip_queue=False,
                     commit=False,
+                    allow_empty_address=True,
                 )
                 self.attach_template_reference(mail)
+                mail.save()
+                mail.to_users.add(user)
+                mail.send()
                 result.append(mail)
         return result
 

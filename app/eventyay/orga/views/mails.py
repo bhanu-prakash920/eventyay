@@ -473,9 +473,6 @@ class ComposeTeamsMail(ComposeMailBaseView):
             return redirect(self.request.event.orga_urls.outbox)
         return super().dispatch(request, *args, **kwargs)
 
-    def get_success_url(self):
-        return self.request.event.orga_urls.outbox
-
 
 class ComposeSessionMail(ComposeMailBaseView):
     form_class = WriteSessionMailForm
