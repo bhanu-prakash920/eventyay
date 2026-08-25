@@ -354,7 +354,7 @@ def test_orga_can_delete_template(orga_client, event, mail_template):
 
 
 @pytest.mark.django_db
-def test_orga_can_compose_single_mail_team(orga_client, review_user, event):
+def test_orga_can_compose_single_mail_team(orga_user, orga_client, review_user, event):
     response = orga_client.get(
         event.orga_urls.compose_mails_teams,
         follow=True,
@@ -388,6 +388,9 @@ def test_orga_can_compose_single_mail_team(orga_client, review_user, event):
         mail = djmail.outbox[0]
         assert mail.subject == f"foo {review_user.fullname}"
         assert mail.body == f"bar {review_user.fullname}"
+        action = saved_mail.logged_actions().filter(action_type="eventyay.mail.sent").first()
+        assert action is not None
+        assert action.person == orga_user
 
     # Verify that the sent reviewer email appears in the sent list view
     sent_list_response = orga_client.get(event.orga_urls.sent_mails)
@@ -432,6 +435,9 @@ def test_orga_can_compose_single_mail_team_by_pk(
             assert saved_mail.sent is not None
             assert saved_mail.subject == f"foo {user.fullname}"
             assert saved_mail.text == f"bar {user.email}"
+            action = saved_mail.logged_actions().filter(action_type="eventyay.mail.sent").first()
+            assert action is not None
+            assert action.person == orga_user
 
 
 @pytest.mark.django_db

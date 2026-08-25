@@ -232,7 +232,8 @@ class WriteMailBaseForm(ScheduledAtValidationMixin, MailTemplateForm):
         widget=TalkSplitDateTimePickerWidget(),
     )
 
-    def __init__(self, *args, may_skip_queue=False, source_template=None, **kwargs):
+    def __init__(self, *args, user=None, may_skip_queue=False, source_template=None, **kwargs):
+        self.user = user
         self.source_template = source_template
         super().__init__(*args, **kwargs)
         if not may_skip_queue:
@@ -336,7 +337,7 @@ class WriteTeamsMailForm(WriteMailBaseForm):
                 self.attach_template_reference(mail)
                 mail.save()
                 mail.to_users.add(user)
-                mail.send()
+                mail.send(requestor=self.user)
                 result.append(mail)
         return result
 
@@ -506,7 +507,7 @@ class WriteSessionMailForm(SubmissionFilterForm, WriteMailBaseForm):
                 result.append(mail)
         if self.cleaned_data.get('skip_queue') and not scheduled_at:
             for mail in result:
-                mail.send()
+                mail.send(requestor=self.user)
         return result
 
 

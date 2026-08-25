@@ -307,7 +307,7 @@ class MailDetail(PermissionRequired, ActionFromUrl, CreateOrUpdateView):
                     messages.error(self.request, error)
                 return redirect(self.get_success_url())
             try:
-                form.instance.send()
+                form.instance.send(requestor=self.request.user)
                 messages.success(self.request, _('The email has been sent.'))
             except SendMailException as e:
                 messages.error(self.request, str(e))
@@ -354,6 +354,7 @@ class ComposeMailBaseView(EventPermissionRequired, FormView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['event'] = self.request.event
+        kwargs['user'] = self.request.user
         initial = kwargs.get('initial', {})
         if 'template' in self.request.GET:
             template = self.request.event.mail_templates.filter(pk=self.request.GET.get('template')).first()
