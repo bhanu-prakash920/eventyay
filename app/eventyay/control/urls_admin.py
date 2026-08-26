@@ -6,6 +6,7 @@ from django.views.generic.base import RedirectView
 from eventyay.control.views import (
     admin,
     global_settings,
+    gmail_oauth,
     pages,
     typeahead,
     user,
@@ -45,7 +46,12 @@ urlpatterns = [
     url(r'^global/settings/$', global_settings.GlobalSettingsView.as_view(), name='admin.global.settings'),
     path('global/settings/preview/', global_settings.GlobalSettingsPagePreviewView.as_view(), name='admin.global.settings.preview'),
     path('global/settings/test-email/', global_settings.GlobalSettingsTestEmailView.as_view(), name='admin.global.settings.test_email'),
+
+    path('global/gmail/connect/', gmail_oauth.GmailOAuthConnectView.as_view(), name='admin.global.gmail.connect'),
+    path('global/gmail/callback/', gmail_oauth.GmailOAuthCallbackView.as_view(), name='admin.global.gmail.callback'),
+    path('global/gmail/disconnect/', gmail_oauth.GmailOAuthDisconnectView.as_view(), name='admin.global.gmail.disconnect'),
     path('global/plugins/', global_settings.GlobalPluginManagementView.as_view(), name='admin.global.plugins'),
+
     url(r'^global/update/$', global_settings.UpdateCheckView.as_view(), name='admin.global.update'),
     url(r'^global/message/$', global_settings.MessageView.as_view(), name='admin.global.message'),
     path('startpage/', global_settings.StartPageSettingsView.as_view(), name='admin.startpage'),
