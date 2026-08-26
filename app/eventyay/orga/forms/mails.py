@@ -174,7 +174,8 @@ class MailDetailForm(ScheduledAtValidationMixin, ReadOnlyFlag, forms.ModelForm):
             self.fields.pop('to_users')
         else:
             self.fields['to_users'].queryset = User.objects.filter(
-                Q(submissions__in=self.instance.event.submissions.all())
+                Q(pk__in=self.instance.to_users.values_list('pk', flat=True))
+                | Q(submissions__in=self.instance.event.submissions.all())
                 | Q(teams__in=self.instance.event.teams.all())
             ).distinct()
             self.fields['to_users'].required = False

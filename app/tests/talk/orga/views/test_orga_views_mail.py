@@ -3,6 +3,7 @@ from django.core import mail as djmail
 from django_scopes import scope
 
 from eventyay.base.models import MailTemplate, MailTemplateRoles, QueuedMail
+from eventyay.orga.forms.mails import MailDetailForm
 
 
 @pytest.mark.django_db
@@ -841,3 +842,11 @@ def test_mail_template_list_hides_auto_created_templates(orga_client, event, mai
     assert response.status_code == 200
     assert 'Hidden duplicate' not in response.text
     assert str(mail_template.subject) in response.text
+
+
+@pytest.mark.django_db
+def test_mail_detail_form_preserves_external_historical_to_users(event, mail, other_speaker):
+    with scope(event=event):
+        mail.to_users.add(other_speaker)
+        form = MailDetailForm(instance=mail)
+        assert other_speaker in form.fields['to_users'].queryset
