@@ -442,6 +442,54 @@ def test_orga_can_compose_single_mail_team_by_pk(
 
 
 @pytest.mark.django_db
+def test_orga_can_compose_team_mail_default_all_teams(
+    orga_user, orga_client, review_user, event
+):
+    team = orga_user.teams.first()
+    assert team in event.teams.all()
+    djmail.outbox = []
+    with scope(event=event):
+        assert QueuedMail.objects.filter(sent__isnull=False).count() == 0
+
+    # Test preview without selecting any recipient group
+    preview_response = orga_client.post(
+        event.orga_urls.compose_mails_teams,
+        follow=True,
+        data={
+            "action": "preview",
+            "subject_0": "foo {name}",
+            "text_0": "bar {email}",
+        },
+    )
+    assert preview_response.status_code == 200
+    assert "There are no recipients matching this selection." not in preview_response.text
+
+    # Test sending without selecting any recipient group
+    response = orga_client.post(
+        event.orga_urls.compose_mails_teams,
+        follow=True,
+        data={
+            "subject_0": "foo {name}",
+            "text_0": "bar {email}",
+        },
+    )
+    assert response.status_code == 200
+    assert response.redirect_chain[-1][0] == event.orga_urls.sent_mails
+    with scope(event=event):
+        assert QueuedMail.objects.filter(sent__isnull=False).count() == 2
+        assert len(djmail.outbox) == 2
+        for user in (orga_user, review_user):
+            saved_mail = QueuedMail.objects.filter(to_users=user).first()
+            assert saved_mail is not None
+            assert saved_mail.sent is not None
+            assert saved_mail.subject == f"foo {user.fullname}"
+            assert saved_mail.text == f"bar {user.email}"
+            action = saved_mail.logged_actions().filter(action_type="eventyay.mail.sent").first()
+            assert action is not None
+            assert action.person == orga_user
+
+
+@pytest.mark.django_db
 def test_orga_can_compose_single_mail(
     orga_client, speaker, event, submission, other_submission
 ):

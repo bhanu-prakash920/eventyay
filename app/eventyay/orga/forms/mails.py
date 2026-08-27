@@ -311,7 +311,10 @@ class WriteTeamsMailForm(WriteMailBaseForm):
 
     def get_recipients(self):
         recipients = self.cleaned_data.get('recipients')
-        teams = self.event.teams.all().filter(pk__in=recipients)
+        if recipients:
+            teams = self.event.teams.all().filter(pk__in=recipients)
+        else:
+            teams = self.event.teams.all()
         return (
             User.objects.filter(is_active=True, teams__in=teams, email__isnull=False)
             .exclude(email='')
