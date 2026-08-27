@@ -1,20 +1,20 @@
 from collections import defaultdict
 from contextlib import suppress
 from datetime import timedelta
-from django.utils import timezone
 
 from bs4 import BeautifulSoup
 from django import forms
 from django.db import transaction
 from django.db.models import Count, Q
+from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.html import escape
 from django.utils.translation import gettext_lazy as _
 from i18nfield.forms import I18nModelForm
 
 from eventyay.base.forms.widgets import SplitDateTimePickerWidget
-from eventyay.control.forms import SplitDateTimeField
-
+from eventyay.base.models import MailTemplate, QueuedMail, Track, User
+from eventyay.base.models.submission import Submission, SubmissionStates
 from eventyay.common.exceptions import SendMailException
 from eventyay.common.forms.fields import I18nEmailBodyFormField
 from eventyay.common.forms.mixins import I18nHelpText, ReadOnlyFlag, ScheduledAtValidationMixin
@@ -22,12 +22,10 @@ from eventyay.common.forms.renderers import InlineFormRenderer, TabularFormRende
 from eventyay.common.forms.widgets import EnhancedSelectMultiple, I18nEmailEditorWidget, SelectMultipleWithCount
 from eventyay.common.language import language
 from eventyay.common.text.phrases import phrases
+from eventyay.control.forms import SplitDateTimeField
 from eventyay.mail.context import get_available_placeholders, get_invalid_placeholders
-from eventyay.base.models import MailTemplate, QueuedMail
-from eventyay.base.models import User
 from eventyay.submission.forms import SubmissionFilterForm
-from eventyay.base.models import Track
-from eventyay.base.models.submission import Submission, SubmissionStates
+
 
 class TalkSplitDateTimePickerWidget(SplitDateTimePickerWidget):
     """Talk-specific widget that uses native HTML5 date and time inputs."""
@@ -36,18 +34,15 @@ class TalkSplitDateTimePickerWidget(SplitDateTimePickerWidget):
         super().__init__(*args, **kwargs)
         date_attrs = self.widgets[0].attrs.copy()
         time_attrs = self.widgets[1].attrs.copy()
-        date_attrs['class'] = ' '.join(
-            c for c in date_attrs.get('class', '').split() if c != 'datepickerfield'
-        )
-        time_attrs['class'] = ' '.join(
-            c for c in time_attrs.get('class', '').split() if c != 'timepickerfield'
-        )
+        date_attrs['class'] = ' '.join(c for c in date_attrs.get('class', '').split() if c != 'datepickerfield')
+        time_attrs['class'] = ' '.join(c for c in time_attrs.get('class', '').split() if c != 'timepickerfield')
         date_attrs['type'] = 'date'
         time_attrs['type'] = 'time'
         self.widgets = (
             forms.DateInput(attrs=date_attrs, format='%Y-%m-%d'),
             forms.TimeInput(attrs=time_attrs, format='%H:%M:%S'),
         )
+
 
 class MailTemplateForm(ReadOnlyFlag, I18nHelpText, I18nModelForm):
     default_renderer = TabularFormRenderer
@@ -228,7 +223,9 @@ class MailDetailForm(ScheduledAtValidationMixin, ReadOnlyFlag, forms.ModelForm):
             'scheduled_at': TalkSplitDateTimePickerWidget(),
         }
         help_texts = {
-            'scheduled_at': _('If set, the email will be sent at this time. Time is interpreted in the event timezone.'),
+            'scheduled_at': _(
+                'If set, the email will be sent at this time. Time is interpreted in the event timezone.'
+            ),
         }
 
 
@@ -274,20 +271,15 @@ class WriteMailBaseForm(ScheduledAtValidationMixin, MailTemplateForm):
         if scheduled_at is not None:
             buffer = timedelta(minutes=1)
             if scheduled_at < timezone.now() - buffer:
-                raise forms.ValidationError(
-                    _('Scheduled time must be in the future.')
-                )
+                raise forms.ValidationError(_('Scheduled time must be in the future.'))
         return scheduled_at
-
 
     def clean(self):
         cleaned_data = super().clean()
         skip_queue = cleaned_data.get('skip_queue')
         scheduled_at = cleaned_data.get('scheduled_at')
         if skip_queue and scheduled_at is not None:
-            raise forms.ValidationError(
-                _('You cannot select "Send immediately" and also specify a scheduled time.')
-            )
+            raise forms.ValidationError(_('You cannot select "Send immediately" and also specify a scheduled time.'))
         return cleaned_data
 
 
@@ -332,11 +324,7 @@ class WriteTeamsMailForm(WriteMailBaseForm):
             teams = self.event.teams.all().filter(pk__in=recipients)
         else:
             teams = self.event.teams.all()
-        return (
-            User.objects.filter(is_active=True, teams__in=teams, email__isnull=False)
-            .exclude(email='')
-            .distinct()
-        )
+        return User.objects.filter(is_active=True, teams__in=teams, email__isnull=False).exclude(email='').distinct()
 
     @transaction.atomic
     def save(self):
@@ -377,7 +365,9 @@ class WriteSessionMailForm(SubmissionFilterForm, WriteMailBaseForm):
         required=False,
         label=phrases.schedule.speakers if phrases.schedule else _('Speakers'),
         help_text=_('Select speakers that should receive the email regardless of the other filters.'),
-        widget=EnhancedSelectMultiple(attrs={'placeholder': phrases.schedule.speakers if phrases.schedule else _('Speakers')}),
+        widget=EnhancedSelectMultiple(
+            attrs={'placeholder': phrases.schedule.speakers if phrases.schedule else _('Speakers')}
+        ),
     )
 
     def __init__(self, **kwargs):
@@ -411,7 +401,8 @@ class WriteSessionMailForm(SubmissionFilterForm, WriteMailBaseForm):
                 self.fields[field_name].help_text = help_text
         if len(self.event.locales) > 1:
             self.fields['subject'].help_text = _(
-                'If you provide only one language, that language will be used for all emails. If you provide multiple languages, the best fit for each speaker will be used.'
+                'If you provide only one language, that language will be used for all emails. '
+                'If you provide multiple languages, the best fit for each speaker will be used.'
             )
         self.warnings = []
 
@@ -459,7 +450,7 @@ class WriteSessionMailForm(SubmissionFilterForm, WriteMailBaseForm):
         for submission in submissions:
             speakers = list(submission.speakers.all())
             current_slots = submission.current_slots or []
-            
+
             # Use schedule slots if the submission is scheduled; otherwise fallback to just the speakers
             if current_slots:
                 for slot in current_slots:
