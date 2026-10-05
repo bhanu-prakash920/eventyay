@@ -7,6 +7,8 @@ from unittest import mock
 import pytest
 from django.core import mail as djmail
 from django.core.files.base import ContentFile
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 from django_countries.fields import Country
 from django_scopes import scope, scopes_disabled
@@ -17,6 +19,7 @@ from eventyay.base.models import (
     InvoiceAddress,
     Order,
     OrderPosition,
+    ProductAddOn,
     Question,
     SeatingPlan,
 )
@@ -3892,6 +3895,31 @@ def test_order_create_all_addons_included_frees_addon_product(token_client, orga
         o = Order.objects.get(code=resp.data['code'])
         addon = o.positions.get(positionid=2)
     assert addon.price == Decimal('0.00')
+
+
+@pytest.mark.django_db
+def test_order_create_all_addons_included_loads_addon_rules_once(token_client, organizer, event, item, quota, question):
+    with scopes_disabled():
+        category = event.categories.create(name='Workshops', is_addon=True)
+        workshop = event.products.create(name='Workshop', category=category, default_price=Decimal('12.00'))
+        quota.products.add(workshop)
+        item.addons.create(addon_category=category, max_count=3)
+        voucher = event.vouchers.create(code='ALLADDONS', product=item, all_addons_included=True)
+    res = all_addons_included_payload(item, question, voucher, workshop)
+    for positionid in (3, 4):
+        res['positions'].append({**res['positions'][1], 'positionid': positionid})
+    with CaptureQueriesContext(connection) as ctx:
+        resp = token_client.post(
+            f'/api/v1/organizers/{organizer.slug}/events/{event.slug}/orders/',
+            format='json',
+            data=res,
+        )
+    assert resp.status_code == 201
+    addon_rule_queries = [q for q in ctx.captured_queries if ProductAddOn._meta.db_table in q['sql']]
+    assert len(addon_rule_queries) <= 1
+    with scopes_disabled():
+        o = Order.objects.get(code=resp.data['code'])
+        assert [p.price for p in o.positions.filter(addon_to__isnull=False)] == [Decimal('0.00')] * 3
 
 
 @pytest.mark.django_db
