@@ -3832,6 +3832,68 @@ def test_order_create_voucher_price(token_client, organizer, event, item, quota,
     assert o.total == Decimal('15.25')
 
 
+def all_addons_included_payload(item, question, voucher, addon_product):
+    res = copy.deepcopy(ORDER_CREATE_PAYLOAD)
+    del res['positions'][0]['item']
+    del res['positions'][0]['price']
+    res['positions'][0]['product'] = item.pk
+    res['positions'][0]['answers'][0]['question'] = question.pk
+    res['positions'][0]['voucher'] = voucher.code
+    res['positions'].append(
+        {
+            'positionid': 2,
+            'product': addon_product.pk,
+            'variation': None,
+            'attendee_name_parts': {'full_name': 'Peter'},
+            'attendee_email': None,
+            'addon_to': 1,
+            'answers': [],
+            'subevent': None,
+        }
+    )
+    return res
+
+
+@pytest.mark.django_db
+def test_order_create_all_addons_included_charges_non_addon_product(
+    token_client, organizer, event, item, quota, question
+):
+    with scopes_disabled():
+        vip = event.products.create(name='VIP Ticket', default_price=Decimal('500.00'))
+        quota.products.add(vip)
+        voucher = event.vouchers.create(code='ALLADDONS', product=item, all_addons_included=True)
+    resp = token_client.post(
+        f'/api/v1/organizers/{organizer.slug}/events/{event.slug}/orders/',
+        format='json',
+        data=all_addons_included_payload(item, question, voucher, vip),
+    )
+    assert resp.status_code == 201
+    with scopes_disabled():
+        o = Order.objects.get(code=resp.data['code'])
+        addon = o.positions.get(positionid=2)
+    assert addon.price == Decimal('500.00')
+
+
+@pytest.mark.django_db
+def test_order_create_all_addons_included_frees_addon_product(token_client, organizer, event, item, quota, question):
+    with scopes_disabled():
+        category = event.categories.create(name='Workshops', is_addon=True)
+        workshop = event.products.create(name='Workshop', category=category, default_price=Decimal('12.00'))
+        quota.products.add(workshop)
+        item.addons.create(addon_category=category)
+        voucher = event.vouchers.create(code='ALLADDONS', product=item, all_addons_included=True)
+    resp = token_client.post(
+        f'/api/v1/organizers/{organizer.slug}/events/{event.slug}/orders/',
+        format='json',
+        data=all_addons_included_payload(item, question, voucher, workshop),
+    )
+    assert resp.status_code == 201
+    with scopes_disabled():
+        o = Order.objects.get(code=resp.data['code'])
+        addon = o.positions.get(positionid=2)
+    assert addon.price == Decimal('0.00')
+
+
 @pytest.mark.django_db
 def test_order_create_voucher_unknown_code(token_client, organizer, event, item, quota, question):
     res = copy.deepcopy(ORDER_CREATE_PAYLOAD)
