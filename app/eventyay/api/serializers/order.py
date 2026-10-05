@@ -1455,8 +1455,10 @@ class OrderCreateSerializer(I18nAwareModelSerializer):
                     ia.last_modified = now()
 
             # Load add-on rules of parent products once, so pricing add-ons does not query per position
+            parent_positionids = {pos_data['addon_to'] for pos_data in positions_data if pos_data.get('addon_to')}
             prefetch_related_objects(
-                [pos_data['product'] for pos_data in positions_data if not pos_data.get('addon_to')], 'addons'
+                [pos_data['product'] for pos_data in positions_data if pos_data['positionid'] in parent_positionids],
+                'addons',
             )
             pos_map = {}
             for pos_data in positions_data:

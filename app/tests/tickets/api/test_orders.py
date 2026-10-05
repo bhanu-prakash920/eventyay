@@ -3923,6 +3923,22 @@ def test_order_create_all_addons_included_loads_addon_rules_once(token_client, o
 
 
 @pytest.mark.django_db
+def test_order_create_without_addons_skips_addon_rules(token_client, organizer, event, item, quota, question):
+    res = copy.deepcopy(ORDER_CREATE_PAYLOAD)
+    del res['positions'][0]['item']
+    res['positions'][0]['product'] = item.pk
+    res['positions'][0]['answers'][0]['question'] = question.pk
+    with CaptureQueriesContext(connection) as ctx:
+        resp = token_client.post(
+            f'/api/v1/organizers/{organizer.slug}/events/{event.slug}/orders/',
+            format='json',
+            data=res,
+        )
+    assert resp.status_code == 201
+    assert not [q for q in ctx.captured_queries if ProductAddOn._meta.db_table in q['sql']]
+
+
+@pytest.mark.django_db
 def test_order_create_voucher_unknown_code(token_client, organizer, event, item, quota, question):
     res = copy.deepcopy(ORDER_CREATE_PAYLOAD)
     res['positions'][0]['item'] = item.pk
